@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import androidx.security.crypto.MasterKeys
 
 /**
  * All settings live in a single [SharedPreferences] instance.
@@ -33,13 +33,11 @@ object SecurePrefs {
             instance?.let { return it }
             val app = context.applicationContext
             val prefs = try {
-                val masterKey = MasterKey.Builder(app)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
+                val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
                 EncryptedSharedPreferences.create(
-                    app,
                     FILE_ENCRYPTED,
-                    masterKey,
+                    masterKeyAlias,
+                    app,
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
