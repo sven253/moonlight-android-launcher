@@ -13,10 +13,15 @@
         android:required="false" />
 
     <!-- Package visibility (Android 11+) so we can check whether the client is installed.
-         Starting it by explicit component works regardless of this list. -->
+         Since the client package name is user-configurable, a fixed <queries> list is not
+         enough; QUERY_ALL_PACKAGES covers forks with arbitrary package names. The app is
+         sideloaded, so the Play Store restriction on this permission does not apply. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
     <queries>
         <package android:name="com.limelight" />
         <package android:name="com.limelight.noir" />
+        <package android:name="com.limelight.unofficial" />
         <package android:name="com.limelight.debug" />
     </queries>
 
