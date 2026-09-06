@@ -1,9 +1,12 @@
 name: Build APK
 
 on:
-  push:
-    branches: [main, master]
+  # Kein Build bei jedem Commit. Der Build startet nur manuell über den
+  # Actions-Tab ("Run workflow") oder wenn ein Tag wie v1.3 gepusht wird.
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build:
