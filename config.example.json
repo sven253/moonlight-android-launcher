@@ -1,0 +1,36 @@
+{
+  "_readme": "Beispielkonfiguration für Moonlight Launcher. Alle Werte anpassen und die Datei in der App unter Einstellungen -> Einstellungen importieren einlesen. Felder, die hier fehlen, bleiben in der App unverändert. Schlüssel mit führendem Unterstrich werden ignoriert und eignen sich für Notizen.",
+
+  "_ziel_pc": "Adresse und Port des PCs, der gestreamt werden soll. 47989 ist der HTTP-Port von Sunshine bzw. GameStream und dient als Erreichbarkeitsprüfung.",
+  "pc_host": "192.168.178.50",
+  "pc_port": "47989",
+  "pc_mac": "a8:a1:59:ab:e9:f6",
+  "wake_timeout": "120",
+
+  "_weckmethode": "use_relay meldet sich per SSH am Relay an. use_direct_wol sendet zusätzlich ein Magic Packet direkt vom TV, was nur im selben Subnetz funktioniert.",
+  "use_relay": true,
+  "use_direct_wol": false,
+
+  "_relay": "Zugangsdaten des WoL-Relays. relay_auth ist entweder password oder key.",
+  "relay_host": "192.168.178.112",
+  "relay_port": "22",
+  "relay_user": "root",
+  "relay_auth": "password",
+  "relay_password": "HIER_PASSWORT_EINTRAGEN",
+
+  "_key_alternative": "Bei relay_auth = key stattdessen relay_key setzen. Zeilenumbrüche im JSON als \\n schreiben, oder den Key in der App über 'Key aus Datei importieren' laden.",
+  "_relay_key": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1r...\n-----END OPENSSH PRIVATE KEY-----",
+  "_relay_key_passphrase": "",
+
+  "_befehl": "%MAC% wird durch die normalisierte MAC-Adresse ersetzt.",
+  "relay_command": "/usr/local/bin/wol-relay.sh %MAC%",
+
+  "_hostkey": "Bei true wird der Fingerprint des Relays bei der ersten Verbindung gespeichert und danach geprüft. host_key_fingerprint leer lassen, dann lernt die App ihn selbst.",
+  "host_key_check": true,
+
+  "_moonlight": "Paketname des Clients: com.limelight für das offizielle Moonlight, Forks weichen ab. UUID und App-ID sind in Moonlight unter 'Details anzeigen' ablesbar. Statt UUID und App-ID lassen sich auch ml_pc_name und ml_app_name verwenden, dann muss Moonlight die App-Liste aber schon geladen haben.",
+  "ml_package": "com.limelight",
+  "ml_class": "com.limelight.ShortcutTrampoline",
+  "ml_pc_uuid": "12345678-1234-1234-1234-123456789abc",
+  "ml_app_id": "881448767"
+}

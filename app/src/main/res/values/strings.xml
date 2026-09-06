@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Moonlight Launcher</string>
+    <string name="settings_title">Moonlight Launcher – Einstellungen</string>
+
+    <string name="action_retry">Erneut versuchen</string>
+
+    <string name="first_run">Erststart – bitte Einstellungen ausfüllen</string>
+    <string name="status_starting_up">Wird vorbereitet …</string>
+    <string name="status_probing">Prüfe %1$s:%2$d …</string>
+    <string name="status_magic_packet">Sende Magic Packet …</string>
+    <string name="status_relay">Wecke PC über %1$s …</string>
+    <string name="status_waiting">Warte auf den PC … %1$d s von %2$d s</string>
+    <string name="status_starting">Starte Moonlight …</string>
+
+    <string name="detail_direct_wol_failed">Magic Packet konnte nicht gesendet werden: %1$s</string>
+
+    <string name="error_config">Einstellungen unvollständig</string>
+    <string name="error_generic">Start fehlgeschlagen</string>
+    <string name="error_relay_exit">Der Weck-Befehl auf dem Relay endete mit Code %1$d. %2$s</string>
+    <string name="error_timeout">Der PC hat sich nach %1$d Sekunden nicht gemeldet. %2$s:%3$d antwortet nicht. Läuft Sunshine bzw. GameStream nach dem Start automatisch?</string>
+
+    <string-array name="auth_entries">
+        <item>Passwort</item>
+        <item>SSH-Key</item>
+    </string-array>
+    <string-array name="auth_values">
+        <item>password</item>
+        <item>key</item>
+    </string-array>
+</resources>
