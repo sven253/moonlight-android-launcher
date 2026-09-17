@@ -30,6 +30,12 @@ class LaunchActivity : AppCompatActivity() {
         // The VPN interface appears a moment before the handshake has actually
         // completed. Probing right away would fail for no good reason.
         const val TUNNEL_SETTLE_MS = 1000L
+
+        // After the tunnel came up, keep probing for a while instead of deciding after a
+        // single attempt. A handshake plus the first routed packets can easily take a few
+        // seconds, and a premature "not reachable" would send us into the wake path — and
+        // from there into an SSH connect that fails hard because the route is not up yet.
+        const val TUNNEL_GRACE_MS = 8000L
     }
 
     private lateinit var statusView: TextView
@@ -56,10 +62,7 @@ class LaunchActivity : AppCompatActivity() {
             if (granted) {
                 startFlow()
             } else {
-                showError(
-                    getString(R.string.error_wg_permission_title),
-                    getString(R.string.error_wg_permission)
-                )
+                showError(getString(R.string.error_wg_permission_title), permissionProblem())
             }
         }
 
@@ -141,19 +144,26 @@ class LaunchActivity : AppCompatActivity() {
     }
 
     private suspend fun runFlow(config: Config) {
+        var tunnelJustStarted = false
         if (config.wgMode == Config.WG_MODE_ALWAYS) {
-            ensureTunnel(config)
+            tunnelJustStarted = ensureTunnel(config)
         }
 
         setStatus(getString(R.string.status_probing, config.pcHost, config.pcPort))
-        var reachable = Net.isHostUp(config.pcHost, config.pcPort, PROBE_TIMEOUT_MS)
+        var reachable = if (tunnelJustStarted) {
+            setStatus(getString(R.string.status_wg_probe))
+            probeWithGrace(config, TUNNEL_GRACE_MS)
+        } else {
+            Net.isHostUp(config.pcHost, config.pcPort, PROBE_TIMEOUT_MS)
+        }
 
         // In auto mode the tunnel is only worth the wait when the PC cannot be reached
         // directly — at home that keeps the launch as fast as it was before.
         if (!reachable && config.wgMode == Config.WG_MODE_AUTO) {
-            ensureTunnel(config)
-            setStatus(getString(R.string.status_probing, config.pcHost, config.pcPort))
-            reachable = Net.isHostUp(config.pcHost, config.pcPort, PROBE_TIMEOUT_MS)
+            if (ensureTunnel(config)) {
+                setStatus(getString(R.string.status_wg_probe))
+                reachable = probeWithGrace(config, TUNNEL_GRACE_MS)
+            }
         }
 
         if (!reachable) {
@@ -172,14 +182,14 @@ class LaunchActivity : AppCompatActivity() {
      * the relay too: if the relay only lives behind the VPN, the SSH step would fail
      * without this.
      */
-    private suspend fun ensureTunnel(config: Config) {
-        if (Wireguard.isUp(this)) return
+    private suspend fun ensureTunnel(config: Config): Boolean {
+        if (Wireguard.isUp(this)) return false
 
         if (!Wireguard.isInstalled(this, config.wgPackage)) {
             throw IllegalStateException(getString(R.string.error_wg_missing, config.wgPackage))
         }
         if (!Wireguard.hasPermission(this)) {
-            throw IllegalStateException(getString(R.string.error_wg_permission))
+            throw IllegalStateException(permissionProblem())
         }
 
         setStatus(getString(R.string.status_wg, config.wgTunnel))
@@ -191,6 +201,25 @@ class LaunchActivity : AppCompatActivity() {
             )
         }
         delay(TUNNEL_SETTLE_MS)
+        return true
+    }
+
+    /** Distinguishes "user said no" from "the system does not know the permission". */
+    private fun permissionProblem(): String =
+        if (Wireguard.isPermissionKnown(this)) {
+            getString(R.string.error_wg_permission)
+        } else {
+            getString(R.string.error_wg_permission_unknown)
+        }
+
+    /** Probes repeatedly for up to [graceMs], for use right after the tunnel came up. */
+    private suspend fun probeWithGrace(config: Config, graceMs: Long): Boolean {
+        val start = SystemClock.elapsedRealtime()
+        while (true) {
+            if (Net.isHostUp(config.pcHost, config.pcPort, PROBE_TIMEOUT_MS)) return true
+            if (SystemClock.elapsedRealtime() - start >= graceMs) return false
+            delay(POLL_INTERVAL_MS)
+        }
     }
 
     private suspend fun wake(config: Config) {

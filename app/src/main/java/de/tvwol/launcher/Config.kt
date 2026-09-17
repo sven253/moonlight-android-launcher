@@ -97,6 +97,7 @@ object Keys {
     const val ACTION_EXPORT_CONFIG = "action_export_config"
     const val ACTION_TEST = "action_test"
     const val ACTION_WG_PERMISSION = "action_wg_permission"
+    const val ACTION_WG_OPEN_APP = "action_wg_open_app"
     const val ACTION_ABOUT = "action_about"
 }
 
@@ -183,6 +184,18 @@ data class Config(
         const val WG_MODE_AUTO = "auto"
         const val WG_MODE_ALWAYS = "always"
 
+        /**
+         * Anything that is not one of the three known modes becomes "off". Without this a
+         * typo in an imported config file would leave usesWireguard true while neither
+         * branch in the launch flow matches, so no tunnel would ever be built and nothing
+         * would say why.
+         */
+        fun normalizeWgMode(raw: String): String = when (raw.trim().lowercase()) {
+            WG_MODE_AUTO -> WG_MODE_AUTO
+            WG_MODE_ALWAYS -> WG_MODE_ALWAYS
+            else -> WG_MODE_OFF
+        }
+
         fun load(context: Context): Config {
             val p = SecurePrefs.get(context)
             fun s(key: String, def: String = "") = p.getString(key, def)?.trim() ?: def
@@ -193,7 +206,7 @@ data class Config(
                 pcPort = i(Keys.PC_PORT, 47989),
                 pcMac = s(Keys.PC_MAC),
                 wakeTimeoutSec = i(Keys.WAKE_TIMEOUT, 120),
-                wgMode = s(Keys.WG_MODE, WG_MODE_OFF),
+                wgMode = normalizeWgMode(s(Keys.WG_MODE, WG_MODE_OFF)),
                 wgPackage = s(Keys.WG_PACKAGE, Wireguard.DEFAULT_PACKAGE),
                 wgTunnel = s(Keys.WG_TUNNEL),
                 wgTimeoutSec = i(Keys.WG_TIMEOUT, 30),

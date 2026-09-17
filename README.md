@@ -69,8 +69,24 @@ Drei Modi stehen unter *Einstellungen -> VPN-Tunnel* zur Wahl:
 
 ### Was in WireGuard eingestellt sein muss
 
-1. In der WireGuard-App unter *Einstellungen* muss **Fernsteuerung durch andere
-   Apps** aktiviert sein. Ohne das verwirft WireGuard den Broadcast kommentarlos.
+1. In der WireGuard-App unter *Einstellungen* muss die Option **Allow remote
+   control apps** aktiviert sein (Standard ist aus, die Zusammenfassung lautet dann
+   *External apps may not toggle tunnels*). Ohne das verwirft WireGuard den
+   Broadcast kommentarlos.
+
+   Auf einer TV-Box führt dort kein direkter Weg hin: WireGuard startet über den
+   TV-Startbildschirm seine Leanback-Oberfläche, und die zeigt nur die Tunnelliste.
+   Deshalb gibt es in diesen Einstellungen den Punkt **WireGuard-Einstellungen
+   öffnen** — er startet WireGuards Telefon-Oberfläche direkt. Dort oben rechts das
+   Zahnrad, Option einschalten, fertig. Einmalig nötig.
+
+   Technisch: WireGuards `SettingsActivity` ist nicht exportiert und lässt sich von
+   außen nicht starten, die `MainActivity` dagegen schon — über sie ist das
+   Einstellungsmenü erreichbar. Dasselbe von Hand per adb:
+
+   ```
+   adb shell am start -n com.wireguard.android/com.wireguard.android.activity.MainActivity
+   ```
 2. Die Berechtigung `CONTROL_TUNNELS` muss erteilt sein. Der Launcher fragt beim
    ersten Start danach; nachträglich geht es über *Einstellungen -> Berechtigung
    für WireGuard*.
@@ -175,6 +191,23 @@ zurückzusetzen.
 
 ## 6. Fehlersuche
 
+**„Der Tunnel … ist nach N Sekunden nicht zustande gekommen."**
+Entweder stimmt der Tunnelname nicht, oder in WireGuard ist „Allow remote control
+apps" nicht aktiviert, oder die VPN-Zustimmung von Android fehlt noch. Zum
+Gegentesten per adb:
+
+```
+adb shell am broadcast -a com.wireguard.android.action.SET_TUNNEL_UP \
+  -n com.wireguard.android/com.wireguard.android.model.TunnelManager\$IntentReceiver \
+  --es tunnel NAME
+```
+
+**„Android kennt die Berechtigung nicht."**
+Eine Berechtigung, die eine andere App definiert, ist nur anforderbar, wenn diese
+App zur Installationszeit schon da war. Wurde der Launcher vor WireGuard
+installiert, hilft nur: Einstellungen exportieren, Launcher deinstallieren, APK
+neu installieren, Einstellungen wieder importieren.
+
 **„Der PC hat sich nach N Sekunden nicht gemeldet."**
 Der Weck-Befehl lief durch, aber Port 47989 antwortet nicht. Prüfen, ob Sunshine
 als Dienst automatisch startet, und ob die Wartezeit für die Boot-Dauer reicht.
@@ -197,7 +230,7 @@ Das Script auf dem Relay ist fehlgeschlagen. Die Fehlerausgabe im Testdialog
 zeigt in der Regel, woran es liegt — häufig ein fehlendes `chmod +x` oder ein
 falscher Pfad.
 
-Mit `adb logcat -s LaunchActivity SecurePrefs` lassen sich zusätzlich die Logs
+Mit `adb logcat -s LaunchActivity SecurePrefs Wireguard` lassen sich zusätzlich die Logs
 der App mitlesen.
 
 ---

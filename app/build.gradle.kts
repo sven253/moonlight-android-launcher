@@ -11,8 +11,8 @@ android {
         applicationId = "de.tvwol.launcher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 6
+        versionName = "1.5"
     }
 
     // A fixed debug keystore checked into the repository. Without it every CI build is

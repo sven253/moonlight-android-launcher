@@ -7,7 +7,7 @@
   "pc_mac": "a8:a1:59:ab:e9:f6",
   "wake_timeout": "120",
 
-  "_wireguard": "wg_mode: off, auto oder always. auto baut den Tunnel nur auf, wenn der PC direkt nicht erreichbar ist. wg_tunnel ist der Name des Tunnels, exakt wie in der WireGuard-App. Voraussetzung: in WireGuard ist 'Fernsteuerung durch andere Apps' aktiviert und der Tunnel wurde dort einmal von Hand gestartet.",
+  "_wireguard": "wg_mode: off, auto oder always. Andere Werte werden als off gelesen. auto baut den Tunnel nur auf, wenn der PC direkt nicht erreichbar ist. wg_tunnel ist der Name des Tunnels, exakt wie in der WireGuard-App. Voraussetzung: in WireGuard ist die Option 'Allow remote control apps' aktiviert und der Tunnel wurde dort einmal von Hand gestartet.",
   "wg_mode": "auto",
   "wg_tunnel": "heim",
   "wg_timeout": "30",

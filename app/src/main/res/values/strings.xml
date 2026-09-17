@@ -22,13 +22,15 @@
     <string name="error_wg_missing">Die WireGuard-App (%1$s) ist auf diesem Gerät nicht installiert.</string>
     <string name="error_wg_permission_title">Berechtigung fehlt</string>
     <string name="error_wg_permission">Der Launcher darf WireGuard nicht steuern. In den Einstellungen unter „Berechtigung für WireGuard“ erteilen.</string>
-    <string name="error_wg_timeout">Der Tunnel „%2$s“ ist nach %1$d Sekunden nicht zustande gekommen. Stimmt der Tunnelname, und ist in WireGuard unter Einstellungen „Fernsteuerung durch andere Apps“ aktiviert?</string>
+    <string name="error_wg_permission_unknown">Android kennt die Berechtigung nicht. Das passiert, wenn der Launcher installiert wurde, bevor WireGuard auf dem Gerät war. Vorher die Einstellungen exportieren, dann den Launcher deinstallieren und die APK erneut installieren.</string>
+    <string name="error_wg_timeout">Der Tunnel „%2$s“ ist nach %1$d Sekunden nicht zustande gekommen. Stimmt der Tunnelname, und ist in WireGuard unter Einstellungen die Option „Allow remote control apps“ aktiviert?</string>
+    <string name="status_wg_probe">Tunnel steht, prüfe den PC …</string>
     <string name="error_timeout">Der PC hat sich nach %1$d Sekunden nicht gemeldet. %2$s:%3$d antwortet nicht. Läuft Sunshine bzw. GameStream nach dem Start automatisch?</string>
 
     <string-array name="wg_mode_entries">
         <item>Aus</item>
-        <item>Automatisch</item>
-        <item>Immer</item>
+        <item>Automatisch (nur wenn PC nicht erreichbar)</item>
+        <item>Immer (vor jedem Start)</item>
     </string-array>
     <string-array name="wg_mode_values">
         <item>off</item>

@@ -72,13 +72,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     private val wgPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!isAdded) return@registerForActivityResult
             updateWireguardSummary()
             dialog(
                 if (granted) "Berechtigung erteilt" else "Berechtigung abgelehnt",
                 if (granted) {
                     "Der Launcher darf den Tunnel jetzt schalten. Damit WireGuard den " +
-                        "Befehl auch annimmt, muss dort unter Einstellungen " +
-                        "„Fernsteuerung durch andere Apps“ aktiviert sein."
+                        "Befehl auch annimmt, muss dort unter Einstellungen die Option " +
+                        "„Allow remote control apps“ aktiviert sein."
                 } else {
                     "Ohne diese Berechtigung kann der Tunnel nicht automatisch " +
                         "aufgebaut werden."
@@ -140,7 +141,27 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     "Die Berechtigung liegt vor. Zum Entziehen: Android-Einstellungen, " +
                         "Apps, Moonlight Launcher, Berechtigungen."
                 )
+                // Requesting a permission the system does not know is refused without any
+                // dialog, so say so instead of letting the user press a dead button.
+                !Wireguard.isPermissionKnown(requireContext()) -> dialog(
+                    "Berechtigung nicht anforderbar",
+                    getString(R.string.error_wg_permission_unknown)
+                )
                 else -> wgPermissionLauncher.launch(Wireguard.PERMISSION)
+            }
+            true
+        }
+
+        findPreference<Preference>(Keys.ACTION_WG_OPEN_APP)?.setOnPreferenceClickListener {
+            val pkg = Config.load(requireContext()).wgPackage
+            if (!Wireguard.isInstalled(requireContext(), pkg)) {
+                dialog(
+                    "WireGuard nicht gefunden",
+                    "Unter dem Paketnamen $pkg ist keine App installiert."
+                )
+            } else {
+                runCatching { Wireguard.openApp(requireContext(), pkg) }
+                    .onFailure { dialog("Öffnen fehlgeschlagen", it.message ?: it.toString()) }
             }
             true
         }
@@ -304,26 +325,31 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun updateWireguardVisibility(modeOverride: String? = null) {
-        val mode = modeOverride ?: Config.load(requireContext()).wgMode
+        if (!isAdded) return
+        val mode = Config.normalizeWgMode(modeOverride ?: Config.load(requireContext()).wgMode)
         val on = mode != Config.WG_MODE_OFF
 
         findPreference<Preference>(Keys.WG_TUNNEL)?.isVisible = on
         findPreference<Preference>(Keys.WG_PACKAGE)?.isVisible = on
         findPreference<Preference>(Keys.WG_TIMEOUT)?.isVisible = on
         findPreference<Preference>(Keys.ACTION_WG_PERMISSION)?.isVisible = on
+        findPreference<Preference>(Keys.ACTION_WG_OPEN_APP)?.isVisible = on
 
         updateWireguardSummary()
     }
 
     private fun updateWireguardSummary() {
+        if (!isAdded) return
         val pref = findPreference<Preference>(Keys.ACTION_WG_PERMISSION) ?: return
         val pkg = Config.load(requireContext()).wgPackage
         pref.summary = when {
             !Wireguard.isInstalled(requireContext(), pkg) ->
                 "$pkg ist auf diesem Gerät nicht installiert."
             Wireguard.hasPermission(requireContext()) ->
-                "Erteilt. In WireGuard muss zusätzlich „Fernsteuerung durch andere " +
-                    "Apps“ aktiviert sein."
+                "Erteilt. In WireGuard muss zusätzlich die Option „Allow remote " +
+                    "control apps“ aktiviert sein."
+            !Wireguard.isPermissionKnown(requireContext()) ->
+                "Nicht anforderbar – der Launcher wurde vor WireGuard installiert."
             else -> "Noch nicht erteilt. Zum Anfordern auswählen."
         }
     }
@@ -468,8 +494,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         report.append(
                             if (ok) "Tunnel ${config.wgTunnel}: steht\n"
                             else "Tunnel ${config.wgTunnel}: kam nicht hoch. Tunnelname " +
-                                "korrekt geschrieben, und ist in WireGuard " +
-                                "„Fernsteuerung durch andere Apps“ aktiviert?\n"
+                                "korrekt geschrieben, und ist in WireGuard die Option " +
+                                "„Allow remote control apps“ aktiviert?\n"
                         )
                     }
                 }

@@ -1,5 +1,6 @@
 package de.tvwol.launcher
 
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -37,6 +38,15 @@ object Wireguard {
     const val DEFAULT_PACKAGE = "com.wireguard.android"
 
     private const val RECEIVER_CLASS = "com.wireguard.android.model.TunnelManager\$IntentReceiver"
+
+    /**
+     * WireGuard's phone-style entry point. It is exported, which matters here: on a TV the
+     * leanback launcher opens TvMainActivity instead, and that screen has no way into the
+     * settings at all. WireGuard's SettingsActivity is not exported, so it cannot be
+     * started from outside — but MainActivity can, and from there the gear icon leads to
+     * the settings including "Allow remote control apps".
+     */
+    private const val MAIN_ACTIVITY = "com.wireguard.android.activity.MainActivity"
     private const val ACTION_UP = "com.wireguard.android.action.SET_TUNNEL_UP"
     private const val ACTION_DOWN = "com.wireguard.android.action.SET_TUNNEL_DOWN"
     private const val EXTRA_TUNNEL = "tunnel"
@@ -53,6 +63,20 @@ object Wireguard {
 
     fun hasPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, PERMISSION) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Whether the system knows the permission at all. A permission declared by another app
+     * only becomes requestable once that app is installed; if the launcher was installed
+     * first, the request is refused immediately and without a dialog, which is impossible
+     * to tell apart from a user saying no. This check makes that case nameable.
+     */
+    fun isPermissionKnown(context: Context): Boolean =
+        try {
+            context.packageManager.getPermissionInfo(PERMISSION, 0)
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
 
     /**
      * True as soon as any VPN interface is up. We cannot ask WireGuard which tunnel is
@@ -83,6 +107,34 @@ object Wireguard {
                 e
             )
         }
+    }
+
+    /**
+     * Opens WireGuard's phone UI, falling back to whatever launcher entry the package
+     * offers if that activity ever goes away or stops being exported.
+     */
+    fun openApp(context: Context, pkg: String) {
+        val direct = Intent(Intent.ACTION_MAIN)
+            .setClassName(pkg, MAIN_ACTIVITY)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(direct)
+            return
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "MainActivity not found in $pkg", e)
+        } catch (e: SecurityException) {
+            Log.w(TAG, "MainActivity of $pkg refused the start", e)
+        }
+
+        val pm = context.packageManager
+        val fallback = pm.getLaunchIntentForPackage(pkg)
+            ?: pm.getLeanbackLaunchIntentForPackage(pkg)
+            ?: throw IllegalStateException(
+                "Die App $pkg lässt sich nicht öffnen. Bitte manuell über den " +
+                    "Startbildschirm aufrufen."
+            )
+        fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(fallback)
     }
 
     /** Polls until a VPN interface shows up. Returns false on timeout. */
