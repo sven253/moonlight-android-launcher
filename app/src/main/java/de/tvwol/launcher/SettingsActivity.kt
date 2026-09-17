@@ -70,6 +70,22 @@ class SettingsFragment : PreferenceFragmentCompat() {
             if (uri != null) importConfig(uri)
         }
 
+    private val wgPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            updateWireguardSummary()
+            dialog(
+                if (granted) "Berechtigung erteilt" else "Berechtigung abgelehnt",
+                if (granted) {
+                    "Der Launcher darf den Tunnel jetzt schalten. Damit WireGuard den " +
+                        "Befehl auch annimmt, muss dort unter Einstellungen " +
+                        "„Fernsteuerung durch andere Apps“ aktiviert sein."
+                } else {
+                    "Ohne diese Berechtigung kann der Tunnel nicht automatisch " +
+                        "aufgebaut werden."
+                }
+            )
+        }
+
     private val exportConfigLauncher =
         registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
             if (uri != null) exportConfig(uri)
@@ -86,11 +102,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
         listOf(
             Keys.PC_HOST, Keys.PC_MAC, Keys.RELAY_HOST, Keys.RELAY_USER,
             Keys.RELAY_COMMAND, Keys.ML_PACKAGE, Keys.ML_CLASS,
-            Keys.ML_PC_UUID, Keys.ML_PC_NAME, Keys.ML_APP_NAME
+            Keys.ML_PC_UUID, Keys.ML_PC_NAME, Keys.ML_APP_NAME,
+            Keys.WG_TUNNEL, Keys.WG_PACKAGE
         ).forEach { tvInput(it, InputType.TYPE_CLASS_TEXT) }
 
-        listOf(Keys.PC_PORT, Keys.RELAY_PORT, Keys.WAKE_TIMEOUT, Keys.ML_APP_ID)
-            .forEach { tvInput(it, InputType.TYPE_CLASS_NUMBER) }
+        listOf(
+            Keys.PC_PORT, Keys.RELAY_PORT, Keys.WAKE_TIMEOUT, Keys.ML_APP_ID,
+            Keys.WG_TIMEOUT
+        ).forEach { tvInput(it, InputType.TYPE_CLASS_NUMBER) }
 
         macSummary(Keys.PC_MAC)
 
@@ -105,6 +124,24 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         findPreference<Preference>(Keys.ACTION_TEST)?.setOnPreferenceClickListener {
             runTest()
+            true
+        }
+
+        findPreference<Preference>(Keys.ACTION_WG_PERMISSION)?.setOnPreferenceClickListener {
+            val pkg = Config.load(requireContext()).wgPackage
+            when {
+                !Wireguard.isInstalled(requireContext(), pkg) -> dialog(
+                    "WireGuard nicht gefunden",
+                    "Unter dem Paketnamen $pkg ist keine App installiert. Offiziell ist " +
+                        "das com.wireguard.android."
+                )
+                Wireguard.hasPermission(requireContext()) -> dialog(
+                    "Bereits erteilt",
+                    "Die Berechtigung liegt vor. Zum Entziehen: Android-Einstellungen, " +
+                        "Apps, Moonlight Launcher, Berechtigungen."
+                )
+                else -> wgPermissionLauncher.launch(Wireguard.PERMISSION)
+            }
             true
         }
 
@@ -141,6 +178,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         updateFingerprintSummary()
         updateAuthVisibility()
+        updateWireguardVisibility()
+
+        findPreference<ListPreference>(Keys.WG_MODE)?.setOnPreferenceChangeListener { _, value ->
+            view?.post { updateWireguardVisibility(value as? String) }
+            true
+        }
 
         findPreference<ListPreference>(Keys.RELAY_AUTH)?.setOnPreferenceChangeListener { _, value ->
             view?.post { updateAuthVisibility(value as? String) }
@@ -260,6 +303,31 @@ class SettingsFragment : PreferenceFragmentCompat() {
         findPreference<Preference>(Keys.ACTION_IMPORT_KEY)?.isVisible = relayOn && auth == "key"
     }
 
+    private fun updateWireguardVisibility(modeOverride: String? = null) {
+        val mode = modeOverride ?: Config.load(requireContext()).wgMode
+        val on = mode != Config.WG_MODE_OFF
+
+        findPreference<Preference>(Keys.WG_TUNNEL)?.isVisible = on
+        findPreference<Preference>(Keys.WG_PACKAGE)?.isVisible = on
+        findPreference<Preference>(Keys.WG_TIMEOUT)?.isVisible = on
+        findPreference<Preference>(Keys.ACTION_WG_PERMISSION)?.isVisible = on
+
+        updateWireguardSummary()
+    }
+
+    private fun updateWireguardSummary() {
+        val pref = findPreference<Preference>(Keys.ACTION_WG_PERMISSION) ?: return
+        val pkg = Config.load(requireContext()).wgPackage
+        pref.summary = when {
+            !Wireguard.isInstalled(requireContext(), pkg) ->
+                "$pkg ist auf diesem Gerät nicht installiert."
+            Wireguard.hasPermission(requireContext()) ->
+                "Erteilt. In WireGuard muss zusätzlich „Fernsteuerung durch andere " +
+                    "Apps“ aktiviert sein."
+            else -> "Noch nicht erteilt. Zum Anfordern auswählen."
+        }
+    }
+
     private fun importPrivateKey(uri: Uri) {
         lifecycleScope.launch {
             val result = runCatching {
@@ -371,6 +439,42 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 else "Client ${config.mlPackage}: NICHT gefunden\n"
             )
 
+            // The tunnel has to come first: without it the PC probe and the relay
+            // login would both be testing the wrong path.
+            if (config.usesWireguard) {
+                val installed = Wireguard.isInstalled(requireContext(), config.wgPackage)
+                val permitted = Wireguard.hasPermission(requireContext())
+                report.append(
+                    if (installed) "WireGuard ${config.wgPackage}: installiert\n"
+                    else "WireGuard ${config.wgPackage}: NICHT gefunden\n"
+                )
+                report.append(
+                    if (permitted) "Berechtigung: erteilt\n"
+                    else "Berechtigung: fehlt\n"
+                )
+                if (installed && permitted) {
+                    if (Wireguard.isUp(requireContext())) {
+                        report.append("Tunnel: läuft bereits\n")
+                    } else {
+                        runCatching {
+                            Wireguard.setTunnel(
+                                requireContext(), config.wgPackage, config.wgTunnel, up = true
+                            )
+                        }.onFailure { report.append("Broadcast: ${it.message}\n") }
+
+                        val ok = Wireguard.waitUntilUp(
+                            requireContext(), config.wgTimeoutSec * 1000L
+                        )
+                        report.append(
+                            if (ok) "Tunnel ${config.wgTunnel}: steht\n"
+                            else "Tunnel ${config.wgTunnel}: kam nicht hoch. Tunnelname " +
+                                "korrekt geschrieben, und ist in WireGuard " +
+                                "„Fernsteuerung durch andere Apps“ aktiviert?\n"
+                        )
+                    }
+                }
+            }
+
             val up = Net.isHostUp(config.pcHost, config.pcPort, 2000)
             report.append(
                 if (up) "PC ${config.pcHost}:${config.pcPort}: erreichbar\n"
@@ -396,6 +500,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
             progress.dismiss()
             updateFingerprintSummary()
+            updateWireguardSummary()
             dialog("Testergebnis", report.toString().trim())
         }
     }

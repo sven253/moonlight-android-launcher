@@ -65,6 +65,12 @@ object Keys {
     const val USE_RELAY = "use_relay"
     const val USE_DIRECT_WOL = "use_direct_wol"
 
+    // WireGuard
+    const val WG_MODE = "wg_mode" // "off" | "auto" | "always"
+    const val WG_PACKAGE = "wg_package"
+    const val WG_TUNNEL = "wg_tunnel"
+    const val WG_TIMEOUT = "wg_timeout"
+
     // SSH relay
     const val RELAY_HOST = "relay_host"
     const val RELAY_PORT = "relay_port"
@@ -90,6 +96,7 @@ object Keys {
     const val ACTION_IMPORT_CONFIG = "action_import_config"
     const val ACTION_EXPORT_CONFIG = "action_export_config"
     const val ACTION_TEST = "action_test"
+    const val ACTION_WG_PERMISSION = "action_wg_permission"
     const val ACTION_ABOUT = "action_about"
 }
 
@@ -99,6 +106,10 @@ data class Config(
     val pcPort: Int,
     val pcMac: String,
     val wakeTimeoutSec: Int,
+    val wgMode: String,
+    val wgPackage: String,
+    val wgTunnel: String,
+    val wgTimeoutSec: Int,
     val useRelay: Boolean,
     val useDirectWol: Boolean,
     val relayHost: String,
@@ -120,6 +131,8 @@ data class Config(
 ) {
     val usesKeyAuth: Boolean get() = relayAuth == "key"
 
+    val usesWireguard: Boolean get() = wgMode != WG_MODE_OFF
+
     /** The MAC in canonical form, or null if what was entered is not a valid MAC. */
     val normalizedMac: String? get() = Net.normalizeMac(pcMac)
 
@@ -139,6 +152,9 @@ data class Config(
         if (pcMac.isNotBlank() && normalizedMac == null) {
             return "Die MAC-Adresse „$pcMac\" ist ungültig. Erwartet werden zwölf " +
                 "Hex-Ziffern, etwa aa:bb:cc:dd:ee:ff."
+        }
+        if (usesWireguard && wgTunnel.isBlank()) {
+            return "Es ist kein Name für den WireGuard-Tunnel eingetragen."
         }
         if (useRelay) {
             if (relayHost.isBlank()) return "Es ist kein Host für das WoL-Relay eingetragen."
@@ -163,6 +179,10 @@ data class Config(
         const val DEFAULT_ML_PACKAGE = "com.limelight"
         const val DEFAULT_ML_CLASS = "com.limelight.ShortcutTrampoline"
 
+        const val WG_MODE_OFF = "off"
+        const val WG_MODE_AUTO = "auto"
+        const val WG_MODE_ALWAYS = "always"
+
         fun load(context: Context): Config {
             val p = SecurePrefs.get(context)
             fun s(key: String, def: String = "") = p.getString(key, def)?.trim() ?: def
@@ -173,6 +193,10 @@ data class Config(
                 pcPort = i(Keys.PC_PORT, 47989),
                 pcMac = s(Keys.PC_MAC),
                 wakeTimeoutSec = i(Keys.WAKE_TIMEOUT, 120),
+                wgMode = s(Keys.WG_MODE, WG_MODE_OFF),
+                wgPackage = s(Keys.WG_PACKAGE, Wireguard.DEFAULT_PACKAGE),
+                wgTunnel = s(Keys.WG_TUNNEL),
+                wgTimeoutSec = i(Keys.WG_TIMEOUT, 30),
                 useRelay = p.getBoolean(Keys.USE_RELAY, true),
                 useDirectWol = p.getBoolean(Keys.USE_DIRECT_WOL, false),
                 relayHost = s(Keys.RELAY_HOST),

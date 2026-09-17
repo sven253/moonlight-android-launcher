@@ -12,6 +12,7 @@ object ConfigIo {
 
     private val STRING_KEYS = listOf(
         Keys.PC_HOST, Keys.PC_PORT, Keys.PC_MAC, Keys.WAKE_TIMEOUT,
+        Keys.WG_MODE, Keys.WG_PACKAGE, Keys.WG_TUNNEL, Keys.WG_TIMEOUT,
         Keys.RELAY_HOST, Keys.RELAY_PORT, Keys.RELAY_USER, Keys.RELAY_AUTH,
         Keys.RELAY_PASSWORD, Keys.RELAY_KEY, Keys.RELAY_KEY_PASSPHRASE,
         Keys.RELAY_COMMAND, Keys.HOST_KEY_FINGERPRINT,

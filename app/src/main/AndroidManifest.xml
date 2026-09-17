@@ -4,6 +4,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Lets us tell the WireGuard app to bring a tunnel up. Declared by WireGuard
+         itself with protectionLevel="dangerous", so it also has to be requested at
+         runtime. Harmless if WireGuard is not installed. -->
+    <uses-permission android:name="com.wireguard.android.permission.CONTROL_TUNNELS" />
+
     <!-- Android TV: no touchscreen, Leanback optional so the APK also installs on phones -->
     <uses-feature
         android:name="android.software.leanback"
@@ -23,6 +28,7 @@
         <package android:name="com.limelight.noir" />
         <package android:name="com.limelight.unofficial" />
         <package android:name="com.limelight.debug" />
+        <package android:name="com.wireguard.android" />
     </queries>
 
     <application

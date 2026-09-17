@@ -5,6 +5,7 @@ Moonlight mit einem festgelegten PC und einer festgelegten App startet.
 
 Ablauf bei jedem Start:
 
+0. Optional: WireGuard-Tunnel aufbauen (siehe Abschnitt 3).
 1. TCP-Verbindungsversuch zum PC (Standard: Port 47989).
 2. Antwortet er, geht es sofort zu Schritt 4.
 3. Antwortet er nicht: SSH zum WoL-Relay, dort den Weck-Befehl ausführen,
@@ -50,7 +51,51 @@ in den Android-Einstellungen erlaubt sein.
 
 ---
 
-## 3. Werte für die Einstellungen finden
+## 3. WireGuard-Tunnel (optional)
+
+Wenn der PC von unterwegs gestreamt werden soll, kann der Launcher vorher einen
+Tunnel der offiziellen WireGuard-App aufbauen. Ein eigener VPN-Stack steckt nicht
+in der App: sie schickt WireGuard nur einen Broadcast und wartet, bis ein
+VPN-Interface da ist.
+
+Drei Modi stehen unter *Einstellungen -> VPN-Tunnel* zur Wahl:
+
+- **Aus** — Verhalten wie bisher.
+- **Automatisch** — erst der normale Erreichbarkeitstest; erst wenn der PC nicht
+  antwortet, wird der Tunnel aufgebaut und erneut geprüft. Zu Hause kostet das
+  keine Zeit.
+- **Immer** — der Tunnel wird vor allem anderen aufgebaut. Sinnvoll, wenn auch
+  das WoL-Relay nur über das VPN erreichbar ist.
+
+### Was in WireGuard eingestellt sein muss
+
+1. In der WireGuard-App unter *Einstellungen* muss **Fernsteuerung durch andere
+   Apps** aktiviert sein. Ohne das verwirft WireGuard den Broadcast kommentarlos.
+2. Die Berechtigung `CONTROL_TUNNELS` muss erteilt sein. Der Launcher fragt beim
+   ersten Start danach; nachträglich geht es über *Einstellungen -> Berechtigung
+   für WireGuard*.
+3. Der Tunnel muss **einmal von Hand** in der WireGuard-App gestartet worden sein,
+   damit die VPN-Zustimmung von Android vorliegt. Danach läuft es ohne Dialog.
+
+Der Tunnelname muss exakt so geschrieben werden wie in WireGuard, inklusive
+Groß- und Kleinschreibung.
+
+### Hinweise
+
+Der Tunnel bleibt nach dem Start von Moonlight bestehen — er wird ja zum Streamen
+gebraucht. Ein automatisches Trennen gibt es nicht, weil der Launcher nicht
+mitbekommt, wann Moonlight beendet wird.
+
+Für das Streaming lohnt sich ein Split-Tunnel: in der Peer-Konfiguration bei
+`AllowedIPs` nur das Heimnetz eintragen (etwa `192.168.178.0/24`) statt
+`0.0.0.0/0`. Sonst läuft der gesamte Datenverkehr der TV-Box durch den Tunnel.
+
+Führt der Tunnel den PC unter einer anderen Adresse, muss `pc_host` die Adresse
+sein, die **über** das VPN gilt.
+
+---
+
+## 4. Werte für die Einstellungen finden
 
 ### PC-UUID und App-ID
 
@@ -91,7 +136,7 @@ einzulesen.
 
 ---
 
-## 4. Empfohlene Absicherung des Relays
+## 5. Empfohlene Absicherung des Relays
 
 Die Zugangsdaten liegen verschlüsselt im App-Speicher (Android Keystore). Auf
 einer TV-Box ohne Displaysperre ist das aber vor allem Verschleierung. Deshalb:
@@ -128,7 +173,7 @@ zurückzusetzen.
 
 ---
 
-## 5. Fehlersuche
+## 6. Fehlersuche
 
 **„Der PC hat sich nach N Sekunden nicht gemeldet."**
 Der Weck-Befehl lief durch, aber Port 47989 antwortet nicht. Prüfen, ob Sunshine
@@ -157,7 +202,7 @@ der App mitlesen.
 
 ---
 
-## 6. Bekannte Grenzen
+## 7. Bekannte Grenzen
 
 Auflösung, Bildrate und Bitrate lassen sich **nicht** pro Verknüpfung setzen.
 Moonlight liest diese Werte beim Streamstart aus seinen eigenen Einstellungen

@@ -26,6 +26,10 @@ class LaunchActivity : AppCompatActivity() {
         const val TAG = "LaunchActivity"
         const val PROBE_TIMEOUT_MS = 1200
         const val POLL_INTERVAL_MS = 1500L
+
+        // The VPN interface appears a moment before the handshake has actually
+        // completed. Probing right away would fail for no good reason.
+        const val TUNNEL_SETTLE_MS = 1000L
     }
 
     private lateinit var statusView: TextView
@@ -37,11 +41,26 @@ class LaunchActivity : AppCompatActivity() {
     private var job: Job? = null
     private var launched = false
     private var awaitingSettings = false
+    private var awaitingPermission = false
+    private var permissionAsked = false
 
     private val settingsLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             awaitingSettings = false
             startFlow()
+        }
+
+    private val permissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            awaitingPermission = false
+            if (granted) {
+                startFlow()
+            } else {
+                showError(
+                    getString(R.string.error_wg_permission_title),
+                    getString(R.string.error_wg_permission)
+                )
+            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,7 +79,7 @@ class LaunchActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (!launched && !awaitingSettings && job == null) {
+        if (!launched && !awaitingSettings && !awaitingPermission && job == null) {
             startFlow()
         }
     }
@@ -95,6 +114,20 @@ class LaunchActivity : AppCompatActivity() {
             return
         }
 
+        // Asking for CONTROL_TUNNELS needs an activity, so it happens here rather than
+        // inside the flow. Only once per activity instance: if the user says no, we show
+        // the error instead of looping on the dialog.
+        if (config.usesWireguard &&
+            !permissionAsked &&
+            !Wireguard.hasPermission(this) &&
+            Wireguard.isInstalled(this, config.wgPackage)
+        ) {
+            permissionAsked = true
+            awaitingPermission = true
+            permissionLauncher.launch(Wireguard.PERMISSION)
+            return
+        }
+
         job = lifecycleScope.launch {
             try {
                 runFlow(config)
@@ -108,9 +141,22 @@ class LaunchActivity : AppCompatActivity() {
     }
 
     private suspend fun runFlow(config: Config) {
-        setStatus(getString(R.string.status_probing, config.pcHost, config.pcPort))
+        if (config.wgMode == Config.WG_MODE_ALWAYS) {
+            ensureTunnel(config)
+        }
 
-        if (!Net.isHostUp(config.pcHost, config.pcPort, PROBE_TIMEOUT_MS)) {
+        setStatus(getString(R.string.status_probing, config.pcHost, config.pcPort))
+        var reachable = Net.isHostUp(config.pcHost, config.pcPort, PROBE_TIMEOUT_MS)
+
+        // In auto mode the tunnel is only worth the wait when the PC cannot be reached
+        // directly — at home that keeps the launch as fast as it was before.
+        if (!reachable && config.wgMode == Config.WG_MODE_AUTO) {
+            ensureTunnel(config)
+            setStatus(getString(R.string.status_probing, config.pcHost, config.pcPort))
+            reachable = Net.isHostUp(config.pcHost, config.pcPort, PROBE_TIMEOUT_MS)
+        }
+
+        if (!reachable) {
             wake(config)
             waitForHost(config)
         }
@@ -119,6 +165,32 @@ class LaunchActivity : AppCompatActivity() {
         Moonlight.launch(this, config)
         launched = true
         finish()
+    }
+
+    /**
+     * Makes sure a tunnel is up before anything else touches the network. Relevant for
+     * the relay too: if the relay only lives behind the VPN, the SSH step would fail
+     * without this.
+     */
+    private suspend fun ensureTunnel(config: Config) {
+        if (Wireguard.isUp(this)) return
+
+        if (!Wireguard.isInstalled(this, config.wgPackage)) {
+            throw IllegalStateException(getString(R.string.error_wg_missing, config.wgPackage))
+        }
+        if (!Wireguard.hasPermission(this)) {
+            throw IllegalStateException(getString(R.string.error_wg_permission))
+        }
+
+        setStatus(getString(R.string.status_wg, config.wgTunnel))
+        Wireguard.setTunnel(this, config.wgPackage, config.wgTunnel, up = true)
+
+        if (!Wireguard.waitUntilUp(this, config.wgTimeoutSec * 1000L)) {
+            throw IllegalStateException(
+                getString(R.string.error_wg_timeout, config.wgTimeoutSec, config.wgTunnel)
+            )
+        }
+        delay(TUNNEL_SETTLE_MS)
     }
 
     private suspend fun wake(config: Config) {

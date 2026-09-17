@@ -31,6 +31,43 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="WireGuard">
+
+        <ListPreference
+            android:key="wg_mode"
+            android:defaultValue="off"
+            android:title="VPN-Tunnel"
+            android:entries="@array/wg_mode_entries"
+            android:entryValues="@array/wg_mode_values"
+            android:dialogMessage="Automatisch: Der Tunnel wird nur aufgebaut, wenn der PC direkt nicht erreichbar ist. Immer: Der Tunnel wird vor jedem Start aufgebaut, auch zu Hause."
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            android:key="wg_tunnel"
+            android:title="Tunnelname"
+            android:dialogMessage="Genau so schreiben, wie der Tunnel in der WireGuard-App heißt. Groß- und Kleinschreibung zählt."
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            android:key="wg_timeout"
+            android:defaultValue="30"
+            android:title="Wartezeit auf den Tunnel (Sekunden)"
+            android:dialogMessage="So lange wird auf das VPN gewartet, bevor der Start abgebrochen wird."
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            android:key="wg_package"
+            android:defaultValue="com.wireguard.android"
+            android:title="Paketname der WireGuard-App"
+            android:dialogMessage="Nur ändern, wenn eine abweichende Variante installiert ist. Die offizielle App ist com.wireguard.android."
+            app:useSimpleSummaryProvider="true" />
+
+        <Preference
+            android:key="action_wg_permission"
+            android:title="Berechtigung für WireGuard" />
+
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="Weck-Methode">
 
         <SwitchPreferenceCompat
